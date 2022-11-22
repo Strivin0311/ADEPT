@@ -54,7 +54,7 @@ ADEPT is a testing platform for Autonomous Driving System, on which we are dedic
 ## Documents
 
 * [Adept Python API reference](waiting...)
-* [WeCam virtual camera installation guide](docs/guide/WeCam virtual camera installation guide.pdf)
+* [WeCam virtual camera installation guide](docs/guide/WeCam%20virtual%20camera%20installation%20guide.pdf)
 
 * [ADEPT ASE2022 Tool Demo paper](https://cs.nju.edu.cn/yuanyao/static/asedemo2022.pdf)
 
