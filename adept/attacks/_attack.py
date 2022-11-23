@@ -15,14 +15,12 @@ class Attacker(ABC):
     waiting for the derived class to implement the details
     """
 
-    def __init__(self, target_model, target_input, target_output):
+    def __init__(self, target_model):
         self.target_model = target_model
-        self.target_input = target_input
-        self.target_output = target_output
 
         self.perb = None
 
-    def _attack(self):
+    def _attack(self, target_input, target_output):
         """
         This is the template method describing the whole attack process
         :return: done: True if attack succeeded, otherwise False |
@@ -73,8 +71,8 @@ class Attacker(ABC):
 
 
 class FGSMAttacker(Attacker):
-    def __init__(self, target_model, target_input, target_output):
-        super().__init__(target_model, target_input, target_output)
+    def __init__(self, target_model):
+        super().__init__(target_model)
 
     def attack_failed(self):
         pass
@@ -96,8 +94,8 @@ class FGSMAttacker(Attacker):
 
 
 class PGDAttacker(Attacker):
-    def __init__(self, target_model, target_input, target_output):
-        super().__init__(target_model, target_input, target_output)
+    def __init__(self, target_model):
+        super().__init__(target_model)
 
     def attack_failed(self):
         pass

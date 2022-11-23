@@ -10,9 +10,12 @@ as a controlled experiment
 from adept.envs import BaseCarlaEnv
 from adept.envs.carla import add_actor, set_weather, set_spectator, \
     get_location_relative_to, get_rotation_relative_to, get_raw_image, \
-    CarlaVersion, WorldName, CameraAttr, SensorType, VehicleType, WeatherType, ActorAddMode, TransformAddMode
-from adept.attacks import DefaultContinuousLoop, DefaultPhysicalLoop
-from adept.vehicles import ReferencePlanner, PurePursuitController
+    CarlaVersion, WorldName, CameraAttr, SensorType, VehicleType, WeatherType, \
+    ActorAddMode, TransformAddMode
+from adept.attacks import DefaultContinuousLoop, DefaultPhysicalLoop, PGDAttacker
+from adept.vehicles import ReferencePlanner, PurePursuitController, End2EndVehicle, \
+    load_vehicle_model
+from adept.transforms import Point, Box2D, WorldCoordinate
 from adept.view import add_video_writer, save_video_frame, \
     show_image, add_image_queue, get_image_from_queue, put_image_to_queue
 
@@ -65,6 +68,7 @@ class NonHijackCarlaEnv(BaseCarlaEnv):
 
     def _init_before_actors(self):
         self._load_camera_info()
+        self._load_billboard_info()
 
     def _init_after_actors(self):
         ## step1: init weather
@@ -75,28 +79,37 @@ class NonHijackCarlaEnv(BaseCarlaEnv):
         pitch, yaw, roll = get_rotation_relative_to(dpitch=-15.0, dyaw=90.0, droll=0.0)
         set_spectator(self.world, transform=TransformAddMode.location_and_rotation,
                       x=x, y=y, z=z, pitch=pitch, yaw=yaw, roll=roll)
-        ## step3: init vehicle
-        self.vehicle = None
+
+        ## step3: load steering model and init vehicle
+        self.model_path = "../../resources/models/NVIDIA model.pkl"
+        self.steering_model = load_vehicle_model(self.model_path, device="gpu")
+        self.vehicle = End2EndVehicle(env=self, model=self.steering_model)
         ## step4: init reference planner
         self.planner = ReferencePlanner(self.ref_path_file, sample_rate=10)  # sample every 10 points
         ## step5: init pure pursuit controller
         self.controller = PurePursuitController(vehicle=self.vehicle, planner=self.planner, lf_gain=0.1)
 
-
+        ## step6: init attacker
+        self.attacker = PGDAttacker(target_model=self.steering_model)
+        ## step7: init physical loop and continuous loop
+        self.phys_loop = NonHijackPhysLoop(vehicle=self.vehicle, attacker=self.attacker,
+                                           target_box=self.billboard_box)
+        self.conti_loop = NonHijackContiLoop(phys_loop=self.phys_loop, env=self, vehicle=self.vehicle,
+                                             planner=self.planner, controller=self.controller)
 
     def _load_camera_info(self):
         # TODO: use configuration file to read/write in the future
 
         ## step1: add video writer
         front_writer, front_save_path = add_video_writer(
-                    width=200, height=200, fps=10, save_path='../../outputs/videos/front'
-                )
+            width=200, height=200, fps=10, save_path='../../outputs/videos/front'
+        )
         back_writer, back_save_path = add_video_writer(
-                    width=1920, height=1080, fps=10, save_path='../../outputs/videos/back'
-                )
+            width=1920, height=1080, fps=10, save_path='../../outputs/videos/back'
+        )
         top_writer, top_save_path = add_video_writer(
-                    width=1920, height=1080, fps=10, save_path='../../outputs/videos/top'
-                )
+            width=1920, height=1080, fps=10, save_path='../../outputs/videos/top'
+        )
         ## step2: define basic camera information
         self.camera_info = {
             "front_camera": {
@@ -123,6 +136,16 @@ class NonHijackCarlaEnv(BaseCarlaEnv):
         self.camera_info["front_camera"]["listen"] = lambda carla_img: self._front_listener(carla_img)
         self.camera_info["back_camera"]["listen"] = lambda carla_img: self._back_listener(carla_img)
         self.camera_info["top_camera"]["listen"] = lambda carla_img: self._top_listener(carla_img)
+
+    def _load_billboard_info(self):
+        # TODO: use configuration file to read/write in the future
+
+        self.billboard_box = Box2D(
+            top_left=Point(coord=WorldCoordinate(*[-6.9, 166.1, 4.9])),
+            top_right=Point(coord=WorldCoordinate(*[-10.1, 166.1, 4.9])),
+            bottom_right=Point(coord=WorldCoordinate(*[-10.1, 166.1, 2.5])),
+            bottom_left=Point(coord=WorldCoordinate(*[-6.9, 166.1, 2.5])),
+        )
 
     def _listener(self, carla_img, camera):
         bgr_img = get_raw_image(carla_img)

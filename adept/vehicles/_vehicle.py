@@ -175,3 +175,19 @@ class SimpleDynamicsVehicleState(BaseVehicleState):
                 return self.velocity
             else:
                 raise KeyError("The key " + key + " is unsupported")
+
+
+# ==================================================================================================
+# -- functions -------------------------------------------------------------------------------------
+# ==================================================================================================
+
+def load_vehicle_model(path, device=None):
+    import torch
+    model = torch.load(path)
+
+    if device == "gpu":
+        model.to(torch.device("cuda") if torch.cuda.is_available() else "cpu")
+    elif device == "cpu":
+        model.to(torch.device("cpu"))
+
+    return model

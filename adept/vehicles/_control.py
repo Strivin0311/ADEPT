@@ -57,6 +57,9 @@ class PurePursuitController(Controller):
         ## the start idx of the key point in the reference path
         self.start = 0
 
+    def get_current_key_point(self):
+        return self.planner.get_target_path()[self.start]
+
     def path_following(self):
         ## step0: get the necessary state(x,y,yaw,v) components of the vehicle
         state = self.vehicle.get_state()
@@ -79,9 +82,6 @@ class PurePursuitController(Controller):
         theta = atan2(2 * wheel_base * sin(alpha), lf)
 
         return theta
-
-    def get_current_key_point(self):
-        return self.planner.get_target_path()[self.start]
 
     def trajectory_following(self):
         pass
