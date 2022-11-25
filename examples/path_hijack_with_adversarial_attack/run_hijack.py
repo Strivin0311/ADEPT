@@ -15,7 +15,7 @@ from adept.envs.carla import add_actor, set_weather, set_spectator, \
 from adept.attacks import DefaultContinuousLoop, DefaultPhysicalLoop, PGDAttacker
 from adept.vehicles import ReferencePlanner, PurePursuitController, End2EndVehicle, \
     load_vehicle_model
-from adept.transforms import Point, Box2D, WorldCoordinate
+from adept.transforms import Point, Box2D, WorldCoordinate, img_transfer
 from adept.view import add_video_writer, save_video_frame, \
     show_image, add_image_queue, get_image_from_queue, put_image_to_queue
 
@@ -24,24 +24,43 @@ from adept.view import add_video_writer, save_video_frame, \
 # -- scripts ---------------------------------------------------------------------------------------
 # ==================================================================================================
 
-class NonHijackPhysLoop(DefaultPhysicalLoop):
+class HijackVehicle(End2EndVehicle):
+    def __init__(self, env, model):
+        super().__init__(env, model)
+
+    def _init_config(self):
+        self.config_map = {
+            "wheel_base": 2.9,
+            "front_camera_height": self.env.camera_info["front_camera"]["height"],
+            "front_camera_width": self.env.camera_info["front_camera"]["width"]
+        }
+
+
+class HijackPhysLoop(DefaultPhysicalLoop):
 
     def __init__(self, vehicle, attacker, target_box):
         super().__init__(vehicle, attacker, target_box)
 
+    def _get_perspective_target_box(self):
+        from adept.transforms import CoordinateTransformer
+        transformer = CoordinateTransformer()
+        perspective_box = super()._get_perspective_target_box()
+        perspective_box = transformer.translate(  # for model's input
+            entity=perspective_box, dx=0, dy=-75
+        )
+        return perspective_box
 
-class NonHijackContiLoop(DefaultContinuousLoop):
+
+class HijackContiLoop(DefaultContinuousLoop):
 
     def __init__(self, phys_loop, env, vehicle, planner, controller):
         super().__init__(phys_loop, env, vehicle, planner, controller)
 
 
-class NonHijackCarlaEnv(BaseCarlaEnv):
+class HijackCarlaEnv(BaseCarlaEnv):
 
     def __init__(self, root, world_name, version, ref_path_file):
         super().__init__(root, world_name, version)
-
-        self.ref_path_file = ref_path_file
 
     def _init_actors(self):
         ## step1: init ego vehicle
@@ -67,6 +86,7 @@ class NonHijackCarlaEnv(BaseCarlaEnv):
             )
 
     def _init_before_actors(self):
+        self.ref_path_file = ref_path_file
         self._load_camera_info()
         self._load_billboard_info()
 
@@ -83,7 +103,7 @@ class NonHijackCarlaEnv(BaseCarlaEnv):
         ## step3: load steering model and init vehicle
         self.model_path = "../../resources/models/NVIDIA model.pkl"
         self.steering_model = load_vehicle_model(self.model_path, device="gpu")
-        self.vehicle = End2EndVehicle(env=self, model=self.steering_model)
+        self.vehicle = HijackVehicle(env=self, model=self.steering_model)
         ## step4: init reference planner
         self.planner = ReferencePlanner(self.ref_path_file, sample_rate=10)  # sample every 10 points
         ## step5: init pure pursuit controller
@@ -92,9 +112,9 @@ class NonHijackCarlaEnv(BaseCarlaEnv):
         ## step6: init attacker
         self.attacker = PGDAttacker(target_model=self.steering_model)
         ## step7: init physical loop and continuous loop
-        self.phys_loop = NonHijackPhysLoop(vehicle=self.vehicle, attacker=self.attacker,
+        self.phys_loop = HijackPhysLoop(vehicle=self.vehicle, attacker=self.attacker,
                                            target_box=self.billboard_box)
-        self.conti_loop = NonHijackContiLoop(phys_loop=self.phys_loop, env=self, vehicle=self.vehicle,
+        self.conti_loop = HijackContiLoop(phys_loop=self.phys_loop, env=self, vehicle=self.vehicle,
                                              planner=self.planner, controller=self.controller)
 
     def _load_camera_info(self):
@@ -175,11 +195,24 @@ class NonHijackCarlaEnv(BaseCarlaEnv):
         ## step0: hold on for 1.5 secs to let the world run a while
         self._hold_on()
 
+        ## step1: physical-continuous loop attack
+        self.conti_loop.loop()
+
     def _hold_on(self):
         self.tick(times=30, sleep=0.05)
 
     def scene_retrieve(self):
-        pass
+        ## step0: retrieve image from queue
+        bgr_img = get_image_from_queue(
+            self.actor_map["front_camera"]["queue"]
+        )
+        ## step1: crop image to fit the model input
+        bgr_img = bgr_img[0:200][75:75 + 66]
+        ## step2: from bgr image to nrgb
+        return img_transfer(bgr_img, fro="bgr", to="nrgb")
+
+    def get_ego_actor(self):
+        return self.actor_map["ego"]
 
 
 if __name__ == "__main__":
@@ -191,7 +224,7 @@ if __name__ == "__main__":
 
     ## step1: construct the self-defined derived carla environment
     # to initialze the world, weather, traffic flow, actors, ego vehicle, etc
-    env = NonHijackCarlaEnv(root=carla_root, world_name=world_name,
+    env = HijackCarlaEnv(root=carla_root, world_name=world_name,
                             version=version, ref_path_file=ref_path_file)
     ## step2: run the environment according to your own task
     env.run()

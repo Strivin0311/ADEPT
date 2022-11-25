@@ -20,7 +20,7 @@ class Attacker(ABC):
 
         self.perb = None
 
-    def _attack(self, target_input, target_output):
+    def attack(self, target_input, target_output):
         """
         This is the template method describing the whole attack process
         :return: done: True if attack succeeded, otherwise False |

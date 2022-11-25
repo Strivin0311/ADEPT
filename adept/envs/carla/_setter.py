@@ -22,6 +22,16 @@ def set_spectator(world, transform, **kwargs):
         spectator.set_transform(transform)
 
 
+def apply_control(vehicle, control_input):
+    import carla
+    control = carla.VehicleControl()
+    control.steer, control.throttle, control.brake = \
+        control_input["s"], control_input["t"], control_input["b"]
+    control.manual_gear_shift = False
+
+    vehicle.apply_control(control)
+
+
 def add_actor(world, key, mode="filter", choose="random", transform="random",
               color=None, specific_attrs=dict, attach_to=None, listen=None, **kwargs):
     bp = get_blueprint(world=world, key=key, mode=mode, choose=choose, **kwargs)

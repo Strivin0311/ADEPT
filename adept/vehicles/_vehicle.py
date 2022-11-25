@@ -3,9 +3,9 @@
 # ==================================================================================================
 
 from abc import ABC, abstractmethod
-from adept.transforms import Coordinate, Pose
-from adept.vehicles import Vector
-from adept.envs import Env
+from adept.envs.carla import retrieve_from, apply_control
+from adept.transforms import Coordinate, Pose, WorldCoordinate, EulerAngle
+from adept.vehicles import Vector, Vector3D
 
 
 # ==================================================================================================
@@ -19,7 +19,7 @@ class Vehicle(ABC):
     waiting for the derived class to implement the details
     """
 
-    def __init__(self, env: Env, model):
+    def __init__(self, env, model):
         self.env = env
         self.model = model
 
@@ -42,7 +42,7 @@ class Vehicle(ABC):
         return self.state
 
     @abstractmethod
-    def get_sensor_output(self, phys_scene, **kwargs):
+    def get_sensor_output(self, phys_scene, sensor, **kwargs):
         sensor_output = None
 
         return sensor_output
@@ -79,20 +79,62 @@ class End2EndVehicle(Vehicle):
     This is the basic class for end-to-end autonomous vehicle
     """
 
-    def __init__(self, env, model):
+    def __init__(self, env, model, device="gpu"):
         super().__init__(env, model)
+        import torch
+        self.device = torch.device("cuda") \
+            if torch.cuda.is_available() and device == "gpu" else torch.device("cpu")
 
     def _init_config(self):
-        self.config_map = {
-            "wheel_base": 2.9,
-
-        }
+        pass
 
     def _init_state(self):
-        pass
+        x, y, z, p, y, r, vx, vy, vz = self._get_ego_vehicle_state()
+        self.state = SimpleDynamicsVehicleState(
+            coord=WorldCoordinate(x=x, y=y, z=z),
+            pose=EulerAngle(pitch=p, yaw=y, roll=r),
+            velocity=Vector3D(vx, vy, vz)
+        )
 
-    def get_sensor_output(self, phys_scene, **kwargs):
-        pass
+    def get_state(self):
+        x, y, z, p, y, r, vx, vy, vz = self._get_ego_vehicle_state()
+        self.state["c"]["x"], self.state["c"]["y"], self.state["c"]["z"] = x, y, z
+        self.state["p"]["p"], self.state["p"]["y"], self.state["p"]["r"] = p, y, r
+        self.state["v"]["x"], self.state["v"]["y"], self.state["v"]["z"] = vx, vy, vz
+        return self.state
+
+    def _get_ego_vehicle_state(self):
+        ego_vehicle = self.env.get_ego_actor()
+        location = retrieve_from(actor=ego_vehicle, about="location")
+        rotation = retrieve_from(actor=ego_vehicle, about="rotation")
+        velocity = retrieve_from(actor=ego_vehicle, about="velocity")
+        return location.x, location.y, location.z, \
+               rotation.pitch, rotation.yaw, rotation.roll, \
+               velocity.x, velocity.y, velocity.z
+
+    def get_sensor_output(self, phys_scene, sensor="camera", **kwargs):
+        import numpy as np
+        import torch
+        self.phys_scene = torch.from_numpy(np.array(phys_scene)).float().div_(255).to(self.device)
+
+    def get_control_input(self):
+        import torch
+
+        ## step1: get steering model's control output
+        ## based on phys_scene from sensor output
+        with torch.no_grad():
+            predict_steer = float(self.model(self.phys_scene))
+
+        ## step2: get whole control input
+        ## from the predicted steer and current velocity
+        ego_vehicle = self.env.get_ego_actor()
+        velocity = retrieve_from(actor=ego_vehicle, about="velocity")
+        return self.env.controller.get_control_from(
+            steer=predict_steer, velocity=velocity)
+
+    def apply_control(self, control_input):
+        apply_control(self.env.get_ego_actor(),
+                      control_input)
 
     def get_perception_input(self):
         pass
@@ -104,12 +146,6 @@ class End2EndVehicle(Vehicle):
         pass
 
     def get_planning_output(self):
-        pass
-
-    def get_control_input(self):
-        pass
-
-    def apply_control(self, control_input):
         pass
 
 

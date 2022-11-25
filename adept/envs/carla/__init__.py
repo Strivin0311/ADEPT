@@ -8,10 +8,12 @@ such as loading world, spawning actors, changing weather, etc
 # ==================================================================================================
 
 from ._load import load_carla, load_client, load_world
-from ._setter import set_weather, set_spectator, add_actor
+from ._setter import set_weather, set_spectator, add_actor, apply_control
 from ._getter import get_blueprint, get_color, get_transform, \
-    get_location_relative_to, get_rotation_relative_to, get_raw_image
-from ._enum import CarlaVersion, WorldName, ActorAttr, CameraAttr, VehicleType, SensorType, WeatherType, \
+    get_location_relative_to, get_rotation_relative_to, get_raw_image, \
+    retrieve_from
+from ._enum import CarlaVersion, WorldName, ActorAttr, CameraAttr, \
+    VehicleType, SensorType, WeatherType, \
     ActorAddMode, TransformAddMode
 
 
@@ -21,9 +23,10 @@ from ._enum import CarlaVersion, WorldName, ActorAttr, CameraAttr, VehicleType, 
 
 __all__ = [  # user interface and other dependent packages
     "load_carla", "load_client", "load_world",
-    "set_weather", "set_spectator", "add_actor",
+    "set_weather", "set_spectator", "add_actor", "apply_control",
     "get_blueprint", "get_color", "get_transform",
     "get_location_relative_to", "get_rotation_relative_to", "get_raw_image",
+    "retrieve_from",
     "CarlaVersion", "WorldName", "ActorAttr", "CameraAttr",
     "VehicleType", "SensorType", "WeatherType",
     "ActorAddMode", "TransformAddMode",

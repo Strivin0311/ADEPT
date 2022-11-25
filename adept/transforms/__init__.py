@@ -11,6 +11,7 @@ from ._coordinate import Coordinate, Coordinate2D, Coordinate3D, \
     ImagePlaneCoordinate, ImagePixelCoordinate, CoordinateTransformer
 from ._pose import Pose, EulerAngle, Quaternion, PoseTransformer
 from ._entity import CoordinateEntity, Point, Line, Box2D, Box3D, SamplePath2D
+from ._image_process import ColorSpace, img_transfer
 
 # ==================================================================================================
 # -- all -------------------------------------------------------------------------------------------
@@ -21,5 +22,6 @@ __all__ = [  # user interface and other dependent packages
     "WorldCoordinate", "CameraCoordinate", "VehicleCoordinate",
     "ImagePlaneCoordinate", "ImagePixelCoordinate",
     "Pose", "PoseTransformer", "EulerAngle", "Quaternion",
-    "CoordinateEntity", "Point", "Line", "Box2D", "Box3D", "SamplePath2D"
+    "CoordinateEntity", "Point", "Line", "Box2D", "Box3D", "SamplePath2D",
+    "ColorSpace", "img_transfer"
 ]

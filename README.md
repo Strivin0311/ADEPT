@@ -33,7 +33,7 @@ ADEPT is a testing platform for Autonomous Driving System, on which we are dedic
 
 *  ADEPT Overview:
 
-<img src="./docs/img/overview.png" alt="overview" style="zoom:45%;" />
+<img src="./docs/img/overview v2.png" alt="overview" style="zoom:45%;" />
 
 * Physical-Continuous Closed Loop Overview:
 

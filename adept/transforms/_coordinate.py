@@ -3,6 +3,7 @@
 # ==================================================================================================
 
 from abc import ABC, abstractmethod
+from adept.transforms import Point, Box2D
 
 
 # ==================================================================================================
@@ -21,6 +22,10 @@ class Coordinate(ABC):
 
     @abstractmethod
     def __getitem__(self, key):
+        pass
+
+    @abstractmethod
+    def tolist(self):
         pass
 
 
@@ -48,6 +53,9 @@ class Coordinate2D(Coordinate):
         else:
             raise KeyError("The key " + key + " is unsupported")
 
+    def tolist(self):
+        return [self.x, self.y]
+
 
 class Coordinate3D(Coordinate2D):
     """
@@ -69,6 +77,9 @@ class Coordinate3D(Coordinate2D):
                 return self.z
             else:
                 raise KeyError("The key " + key + " is unsupported")
+
+    def tolist(self):
+        return super().tolist().append(self.z)
 
 
 class WorldCoordinate(Coordinate3D):
@@ -177,5 +188,70 @@ class CoordinateTransformer:
     def __init__(self):
         pass
 
-    def transform(self, fro, to, **kwargs):
+    def transform(self, entity, fro, to, **kwargs):
+        if fro == "world" and to == "pixel":
+            return self._transform_world2pixel(
+                entity=entity,
+                x=kwargs["state"]["c"]["x"], y=kwargs["state"]["c"]["y"], z=kwargs["state"]["c"]["z"],
+                pitch=kwargs["state"]["p"]["p"], yaw=kwargs["state"]["p"]["y"], roll=kwargs["state"]["p"]["r"],
+                h=kwargs["image_height"], w=kwargs["image_width"]
+            )
+
+    def translate(self, entity, dx=0, dy=0):
         pass
+
+    def _transform_world2pixel(self, entity, x, y, z, pitch, yaw, roll, h, w):
+        import math
+        import numpy as np
+        front_vec, left_vec, up_vec = [1, 0, 0], [0, 1, 0], [0, 0, 1]
+
+        def trans_vector(vector, pitch, yaw, roll):
+            def trans_pitch(x, y, z, pitch):
+                newx = x * math.cos(pitch) - z * math.sin(pitch)
+                newy = y
+                newz = x * math.sin(pitch) + z * math.cos(pitch)
+                return newx, newy, newz
+
+            def trans_yaw(x, y, z, yaw):
+                newx = x * math.cos(yaw) - y * math.sin(yaw)
+                newy = x * math.sin(yaw) + y * math.cos(yaw)
+                newz = z
+                return newx, newy, newz
+
+            def trans_roll(x, y, z, roll):
+                newx = x
+                newy = z * math.sin(roll) + y * math.cos(roll)
+                newz = z * math.cos(roll) - y * math.sin(roll)
+                return newx, newy, newz
+
+            x, y, z = vector[0], vector[1], vector[2]
+            x, y, z = trans_pitch(x, y, z, pitch)
+            x, y, z = trans_yaw(x, y, z, yaw)
+            x, y, z = trans_roll(x, y, z, roll)
+            return [x, y, z]
+
+        pitch, yaw, roll = pitch / 180 * math.pi, yaw / 180 * math.pi, roll / 180 * math.pi
+        front_vec = trans_vector(front_vec, pitch, yaw, roll)
+        left_vec = trans_vector(left_vec, pitch, yaw, roll)
+        up_vec = trans_vector(up_vec, pitch, yaw, roll)
+
+        points = []
+        for point in entity:
+            coord = point["c"]
+            point_vec = [coord["x"]-x, coord["y"]-y, coord["z"]-z]
+
+            tmp_f, tmp_x, tmp_y = np.dot(point_vec, front_vec), \
+                      np.dot(point_vec, left_vec), np.dot(point_vec, up_vec)
+            if tmp_f < 0:
+                return None
+
+            tan_x = tmp_x / tmp_f
+            tan_y = tmp_y / tmp_f
+
+            px = (tan_x * 0.5 * w) + w / 2
+            py = -(tan_y * 0.5 * h) + h / 2
+
+            points.append(Point(Coordinate2D(x=px, y=py)))
+
+        if len(points) == 4:  # box
+            return Box2D(*points)

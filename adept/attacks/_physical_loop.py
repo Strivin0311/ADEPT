@@ -151,13 +151,13 @@ class DefaultPhysicalLoop(PhysicalLoop):
         self.target_box = target_box
 
     def inner_loop_failed(self):
-        pass
+        return self.attacker.attack_failed()
 
     def inner_loop_succeeded(self):
-        pass
+        return self.attacker.attack_succeeded()
 
     def inner_loop_update(self):
-        pass
+        return self.attacker.attack_update()
 
     def sensor_capture(self, phys_scene):
         return self.camera_capture(phys_scene, which="front")
@@ -166,26 +166,50 @@ class DefaultPhysicalLoop(PhysicalLoop):
         return self.vehicle.get_sensor_output(phys_scene, "camera", which)
 
     def region_extract(self, scene, mask):
-        pass
+        import numpy as np
+        target = []
+        for m in mask:
+            target.append(
+                np.multiply(scene, m)
+            )
+        return target
 
     def mask_target_generate(self, scene):
-        return self.mask_generate(scene, template="box", box=self.target_box)
+        perspective_box = self._get_perspective_target_box()
+
+        import numpy as np
+        mask = np.zeros_like(scene, dtype=np.uint8)
+        target_mask = self._fill_mask_with_box(mask, perspective_box)
+        bgr_mask = self._fill_mask_with_box(mask, perspective_box, reverse=True)
+        return target_mask, bgr_mask
+
+    def _get_perspective_target_box(self):
+        from adept.transforms import CoordinateTransformer
+        transformer = CoordinateTransformer()
+        perspective_box = transformer.transform(
+            entity=self.target_box,
+            fro="world", to="pixel", state=self.vehicle.get_state(),
+            image_width=self.vehicle.get_config("front_camera_width"),
+            image_height=self.vehicle.get_config("front_camera_height")
+        )
+        return perspective_box
+
+    def _fill_mask_with_box(self, mask, box, reverse=False):
+        import numpy as np
+        import cv2
+        area = np.array([
+            box["top_left"]["c"].tolist(),
+            box["top_right"]["c"].tolist(),
+            box["bottom_right"]["c"].tolist(),
+            box["bottom_left"]["c"].tolist()
+        ])
+        cv2.fillPoly(mask, area, (1, 1, 1))
+        if reverse:
+            return np.ones_like(mask, dtype=np.uint8) - mask
 
     def mask_adv_generate(self, scene):
-        return self.mask_generate(scene, template="whole")
-
-    def mask_generate(self, scene, template="whole", **kwargs):
-        import torch
-        if template == "whole":  # keep the whole scene area
-            return torch.ones_like(scene)
-        elif template == "box":  # keep one box sub-area of the scene
-            try:
-                box = kwargs["box"]
-                
-            except KeyError:
-                print("The required key: \'box\' hasn't been set")
-        else:
-            raise KeyError("The template " + template + "is unsupported")
+        import numpy as np
+        return np.ones_like(scene, dtype=np.uint8)
 
     def dig_replace(self, dig_scene, adv_target, mask):
         pass

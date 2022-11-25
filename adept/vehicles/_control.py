@@ -43,7 +43,7 @@ class PurePursuitController(Controller):
     paper link: https://apps.dtic.mil/sti/pdfs/ADA255524.pdf
     """
 
-    def __init__(self, vehicle, planner, ld=2.6, lf_gain=0.0,):
+    def __init__(self, vehicle, planner, ld=2.6, lf_gain=0.0, ):
         super().__init__()
 
         ## hold the vehicle and the planner
@@ -76,15 +76,25 @@ class PurePursuitController(Controller):
         xr, yr = p["c"]["x"], p["c"]["y"]
         ## step3: calculate the look-forward angle alpha
         from math import atan2, sin
-        alpha = atan2(yr-y, xr-x) - yaw
+        alpha = atan2(yr - y, xr - x) - yaw
         ## step4: calculate the target steering angle theta
         wheel_base = self.vehicle.get_config("wheel_base")
         theta = atan2(2 * wheel_base * sin(alpha), lf)
 
-        return theta
+        return self.get_control_from(steer=theta, velocity=v)
 
     def trajectory_following(self):
         pass
+
+    def get_control_from(self, steer, velocity):
+        throttle = 0.0
+        brake = 0.0
+        if velocity < 1.0:
+            throttle = 0.3
+        else:
+            throttle = 0.2
+
+        return ControlInput(steer, throttle, brake)
 
 
 class ControlInput:
@@ -92,5 +102,27 @@ class ControlInput:
     This is the record class to describe the control input
     """
 
-    def __init__(self):
-        pass
+    def __init__(self, steer=0.0, throttle=0.0, brake=0.0):
+        import numpy as np
+        self.steer = np.clip(steer, -1.0, 1.0)
+        self.throttle = np.clip(throttle, 0.0, 1.0)
+        self.brake = np.clip(brake, 0.0, 1.0)
+
+    def _is_key_for_steer(self, key):
+        return key == 0 or key == 's' or key == 'steer' or key == 'angle' or key == 'theta'
+
+    def _is_key_for_throttle(self, key):
+        return key == 1 or key == 't' or key == 'throttle'
+
+    def _is_key_for_brake(self, key):
+        return key == 2 or key == 'b' or key == 'brake'
+
+    def __getitem__(self, key):
+        if self._is_key_for_steer(key):
+            return self.steer
+        elif self._is_key_for_throttle(key):
+            return self.throttle
+        elif self._is_key_for_brake(key):
+            return self.brake
+        else:
+            raise KeyError("The key " + key + " is unsupported")

@@ -22,6 +22,8 @@ class ContinuousLoop(ABC):
         self.planner = planner
         self.controller = controller
 
+        self.attack = False  # the flag to decide whether the physical attack loop will be executed
+
     def loop(self):
         """
         This is the template method describing the whole loop for Continuous Loop Attack
@@ -44,7 +46,7 @@ class ContinuousLoop(ABC):
             ## based on generated adversarial physical scene
             adv_input = self.input_vehicle_compute(adv_phys_scene)
             ## step5: let vehicle update its state
-            ## based on the current state and input
+            ## based on the current state and control input(i.e. apply contorl)
             self.state_vehicle_update(adv_input)
 
             if self.task_succeeded():  # if task succeeded, then early stop
@@ -55,6 +57,9 @@ class ContinuousLoop(ABC):
         return self.loop_end()  # some final work before return
 
     def scene_adv_generate(self, phys_scene, target_input):
+        if not self.attack:  # no physical attack
+            return phys_scene
+
         adv_phys_scene = self.phys_loop.loop(phys_scene, target_input)
 
         return adv_phys_scene
@@ -163,18 +168,11 @@ class DefaultContinuousLoop(ContinuousLoop):
         return self.env.scene_retrieve()
 
     def input_controller_compute(self):
-        ## step1: get the current state of the vehicle
-        state = self.state_vehicle_retrieve()
-        ## step2: get the target path from the planner
-        target_path = self.planner.get_target_path()
-        ## step3: get the target control input from the controller
-        ## using some kind of path following algorithm
-        target_control_input = self.controller.path_following(state, target_path)
-
-        return target_control_input
+        return self.controller.path_following()
 
     def input_vehicle_compute(self, phys_scene):
-        return self.vehicle.get_control_input(phys_scene)
+        self.vehicle.get_sensor_output(phys_scene)
+        return self.vehicle.get_control_input()
 
     def state_vehicle_retrieve(self):
         return self.vehicle.get_state()

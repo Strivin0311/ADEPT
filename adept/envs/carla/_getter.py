@@ -106,14 +106,26 @@ def get_raw_image(carla_image, format="bgr"):
     raw_img = np.array(carla_image.raw_data)  # take raw data from carla image
     raw_img = np.reshape(raw_img, newshape=(carla_image.height, carla_image.width, 4))  # 4 channels: BGRA
     if format == "bgr":
-        return cv2.cvtColor(raw_img, cv2.BGRA2BGR) # BGRA => RGB
+        return cv2.cvtColor(raw_img, cv2.BGRA2BGR)  # BGRA => RGB
     elif format == "rgb":
         return cv2.cvtColor(raw_img, cv2.BGRA2RGB)  # BGRA => BGR
     elif format == "gray":
-        return cv2.cvtColor(raw_img, cv2.BGRA2GRAY) # BGRA => GRAY
+        return cv2.cvtColor(raw_img, cv2.BGRA2GRAY)  # BGRA => GRAY
     elif format == "hsv":
-        return cv2.cvtColor(raw_img, cv2.BGRA2HSV) # BGRA => HSV
+        return cv2.cvtColor(raw_img, cv2.BGRA2HSV)  # BGRA => HSV
     elif format == "yuv":
         return cv2.cvtColor(raw_img, cv2.BGRA2YUV)  # BGRA => YUV
 
     return raw_img  # BGRA
+
+
+def retrieve_from(actor, about="transform"):
+    if actor is not None:
+        if about == "tranform":
+            return actor.get_transform()
+        elif about == "location":
+            return actor.get_transform().location
+        elif about == "rotation":
+            return actor.get_transform().rotation
+        elif about == "velocity":
+            return actor.get_velocity()

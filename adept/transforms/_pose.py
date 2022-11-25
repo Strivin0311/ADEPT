@@ -35,7 +35,7 @@ class EulerAngle(Pose):
         3. the yaw is to describe the rotation on the z-axis
     """
 
-    def __init__(self, pitch, roll, yaw):
+    def __init__(self, pitch=0.0, roll=0.0, yaw=0.0):
         super().__init__()
         self.pitch = pitch
         self.roll = roll
@@ -72,7 +72,7 @@ class Quaternion(Pose):
         3. q1q2 = (w1w2 - v1v2) + w1v2 + w2v1 + v1xv2, which represents rotate by q2 and then by q1
     """
 
-    def __init__(self, w, x, y, z):
+    def __init__(self, w=0.0, x=0.0, y=0.0, z=0.0):
         super().__init__()
         self.w = w  # real part
         self.v = [x, y, z]  # virtual part

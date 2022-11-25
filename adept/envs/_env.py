@@ -85,6 +85,17 @@ class BaseCarlaEnv(Env, ABC):
     def scene_retrieve(self):
         pass
 
+    def get_world(self):
+        return self.world
+
+    def get_actor(self, key):
+        if key in self.actor_map:
+            return self.actor_map[key]
+
+    @abstractmethod
+    def get_ego_actor(self):
+        pass
+
     @ abstractmethod
     def run(self):
         pass
